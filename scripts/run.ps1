@@ -119,6 +119,11 @@ $timedOut = $false
 $process = $null
 $tempScriptPath = $null
 $cleanupWarnings = New-Object System.Collections.Generic.List[string]
+$startedAt = Get-Date
+
+# Without this, Python child processes buffer stdout into the log file, and a
+# long run shows no progress until it ends.
+$env:PYTHONUNBUFFERED = "1"
 
 try {
     Write-Section "Wrapper configuration"
@@ -209,6 +214,21 @@ catch {
 finally {
     Write-Section "Cleanup"
 
+    # Written before the lock is removed, so an observer never sees a run that
+    # is neither active nor finished. summarize-run-log.py reads this section.
+    try {
+        @(
+            "---- Result ----"
+            "ExitCode: $childExitCode"
+            "TimedOut: $timedOut"
+            "DurationSec: $([int]((Get-Date) - $startedAt).TotalSeconds)"
+            "Finished: $(Get-Date -Format s)"
+        ) | Add-Content -LiteralPath $metaLog -Encoding UTF8
+    }
+    catch {
+        $cleanupWarnings.Add("Could not append run result to meta log: $metaLog")
+    }
+
     if ($null -ne $tempScriptPath -and (Test-Path -LiteralPath $tempScriptPath)) {
         try {
             Remove-Item -LiteralPath $tempScriptPath -Force -ErrorAction Stop
@@ -246,16 +266,44 @@ finally {
     }
 }
 
-Write-Section "Log tails"
+# A compact verdict (result, prioritized primary errors, short tails) instead of
+# raw tails: an agent reads it first and opens the full logs only if needed.
+# The summarizer is shared workspace tooling in Others/dev-utils; without it the
+# wrapper falls back to plain tails.
+$devUtilsRoot = if ($env:DEV_UTILS_ROOT) { $env:DEV_UTILS_ROOT } else { Join-Path $repoRoot "..\..\Others\dev-utils" }
+$summarizer = Join-Path $devUtilsRoot "summarize-run-log.py"
+$python = Get-Command python.exe -ErrorAction SilentlyContinue
+$summarized = $false
 
-if (Test-Path -LiteralPath $stdoutLog) {
-    Write-Host "--- stdout tail ---"
-    Get-Content -LiteralPath $stdoutLog -Tail 30 -ErrorAction SilentlyContinue
+if ($python -and (Test-Path -LiteralPath $summarizer)) {
+    Write-Host ""
+    $previousEncoding = [Console]::OutputEncoding
+    $env:PYTHONIOENCODING = "utf-8"
+    try {
+        [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+        & $python.Source $summarizer $metaLog
+        $summarized = ($LASTEXITCODE -eq 0)
+    }
+    catch {
+        Write-Warning "summarize-run-log.py failed: $($_.Exception.Message)"
+    }
+    finally {
+        [Console]::OutputEncoding = $previousEncoding
+    }
 }
 
-if (Test-Path -LiteralPath $stderrLog) {
-    Write-Host "--- stderr tail ---"
-    Get-Content -LiteralPath $stderrLog -Tail 30 -ErrorAction SilentlyContinue
+if (-not $summarized) {
+    Write-Section "Log tails"
+
+    if (Test-Path -LiteralPath $stdoutLog) {
+        Write-Host "--- stdout tail ---"
+        Get-Content -LiteralPath $stdoutLog -Tail 30 -ErrorAction SilentlyContinue
+    }
+
+    if (Test-Path -LiteralPath $stderrLog) {
+        Write-Host "--- stderr tail ---"
+        Get-Content -LiteralPath $stderrLog -Tail 30 -ErrorAction SilentlyContinue
+    }
 }
 
 exit $childExitCode

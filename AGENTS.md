@@ -176,4 +176,46 @@ process tree (`taskkill /T`).
 - A process that survives the timeout is a bug in how it was spawned — not a
   reason to widen the cleanup.
 
+## Long runs: wait cheaply
+
+Real-1C syntax checks, Vanessa suites, `obfuscate-build.ps1` and the
+`validate-*` gates, native builds, and full parity suites run for minutes to an
+hour. The run itself costs no tokens. Every time you wake up to check on it,
+the whole conversation is sent again. At 150k tokens of context, polling a
+20-minute run every 50 seconds costs more than the rest of the task.
+
+- Before starting, look up how long similar runs took: `DurationSec` in
+  `.artifacts/test-logs/*.meta.log`. Set the timeout from that, not from a guess.
+- Start the run once, then wait in as few wake-ups as possible:
+  - **Codex:** hand the run to the `awaiter` subagent (`spawn_agent` with
+    `agent_type: "awaiter"`). Give it the exact command, the working directory,
+    and the timeout, and ask only for the final result. Its context is small,
+    so its polls are cheap. Wait for its answer with the longest timeout
+    `wait_agent` allows.
+  - **Without a subagent:** give the command the longest wait the tool allows.
+    In Codex, that is `yield_time_ms` up to `background_terminal_max_timeout`
+    (30 minutes on this workstation). In Claude Code, run the command with
+    `run_in_background` and wait for the completion notification; that is a
+    tracked tool call, not a detached background process. If the run is still
+    going, poll at growing intervals (5, 10, 20 minutes), never more often than
+    every 5 minutes.
+  - Never give a long command a short `yield_time_ms` such as `1000`, and never
+    poll it through a `write_stdin` plus `wait` pair.
+- While the run is in progress, do nothing about it:
+  - no progress messages;
+  - no log tails or process lists;
+  - no reading the tool's source to explain missing output.
+
+  Output that appears only at the end is expected: child tools run with captured
+  output.
+
+- When the run ends, read the `==== Summary ====` block first. `scripts/run.ps1`
+  prints it at the end of the run. For a finished run, get it again with
+  `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or log file>`.
+  Open the full logs only if the summary is not enough. Then read a bounded
+  slice around the reported line, not the whole file.
+- Start a long run with a small context. Do not load whole files "just in case"
+  beforehand. If the conversation is already large, hand the run to the
+  awaiter.
+
 <!-- agent-rules:end -->

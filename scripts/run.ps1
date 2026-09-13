@@ -22,7 +22,15 @@ param(
 
     [string]$LogDir = ".artifacts\test-logs",
 
-    [switch]$UseWindowsPowerShell
+    [switch]$UseWindowsPowerShell,
+
+    # Shared lock on the agent board (Others/dev-utils/board.py). "auto" takes the
+    # "1c" lock when the command drives 1C; "none" skips locking; any other value
+    # is taken as the resource name.
+    [string]$Lock = "auto",
+
+    # How long to wait for a busy lock before giving up with exit code 75.
+    [int]$LockWaitSec = 0
 )
 
 Set-StrictMode -Version Latest
@@ -44,15 +52,15 @@ function Ensure-Directory {
 function Stop-ProcessTree {
     param(
         [Parameter(Mandatory = $true)]
-        [int]$Pid
+        [int]$TaskProcessId
     )
 
-    Write-Host "Stopping process tree for PID=$Pid"
-    & taskkill /PID $Pid /T /F | Out-Null
+    Write-Host "Stopping process tree for PID=$TaskProcessId"
+    & taskkill /PID $TaskProcessId /T /F | Out-Null
     $taskkillExit = $LASTEXITCODE
 
     if ($taskkillExit -ne 0) {
-        Write-Warning "taskkill returned exit code $taskkillExit for PID=$Pid"
+        Write-Warning "taskkill returned exit code $taskkillExit for PID=$TaskProcessId"
         return $false
     }
 
@@ -112,6 +120,49 @@ if (Test-Path -LiteralPath $lockPath) {
     throw "Wrapper lock file exists: $lockPath . A previous run may still be active."
 }
 
+# Two runs driving 1C at once break each other: Configurator automation needs the
+# desktop focus and clipboard, and Vanessa needs the same test infobase. The
+# repository lock above cannot see runs from other repositories, so 1C runs also
+# take a machine-wide lock on the shared agent board.
+$devUtilsRoot = if ($env:DEV_UTILS_ROOT) { $env:DEV_UTILS_ROOT } else { Join-Path $repoRoot "..\..\Others\dev-utils" }
+$python = Get-Command python.exe -ErrorAction SilentlyContinue
+$boardScript = Join-Path $devUtilsRoot "board.py"
+$boardResource = $null
+if ($Lock -eq "auto") {
+    if ($Command -match '(?i)real_1c|test-1c|validate-\w+-vanessa|obfuscate-build|syntax-check|vanessa|1cv8') {
+        $boardResource = "1c"
+    }
+}
+elseif ($Lock -ne "none") {
+    $boardResource = $Lock
+}
+
+$boardLock = $null
+if ($boardResource) {
+    if ($python -and (Test-Path -LiteralPath $boardScript)) {
+        $reason = "$(Split-Path -Leaf $repoRoot): $($Command.Substring(0, [Math]::Min(200, $Command.Length)))"
+        $lockOutput = & $python.Source $boardScript lock $boardResource --owner "run.ps1" --pid $PID `
+            --ttl-sec ($TimeoutSec + 300) --wait-sec $LockWaitSec --reason $reason 2>&1
+        $lockExit = $LASTEXITCODE
+        if ($lockExit -eq 0) {
+            $boardLock = ($lockOutput | Out-String | ConvertFrom-Json)
+        }
+        elseif ($lockExit -eq 75) {
+            $holder = ($lockOutput | Out-String | ConvertFrom-Json)
+            Write-Host "Resource '$boardResource' is busy: $($holder.owner) pid $($holder.pid) since $($holder.acquired), expires $($holder.expires)"
+            Write-Host "Held for: $($holder.reason)"
+            Write-Host "Not started. Wait for it with -LockWaitSec, or pass -Lock none if this run does not touch 1C."
+            exit 75
+        }
+        else {
+            Write-Warning "Board lock unavailable ($lockExit): $($lockOutput | Out-String). Running without the shared lock."
+        }
+    }
+    else {
+        Write-Warning "board.py or python not found; running without the shared '$boardResource' lock."
+    }
+}
+
 New-Item -ItemType File -Path $lockPath -Force | Out-Null
 
 $childExitCode = 1
@@ -145,6 +196,7 @@ try {
         "WorkingDirectory: $WorkingDirectory"
         "Shell: $shellExe"
         "TimeoutSec: $TimeoutSec"
+        "BoardLock: $(if ($null -ne $boardLock) { $boardResource } else { 'none' })"
         "ChildScript: $tempScriptPath"
         "Command:"
         $Command
@@ -176,7 +228,7 @@ try {
         $timedOut = $true
         Write-Warning "Command timed out after $TimeoutSec seconds."
 
-        $killed = Stop-ProcessTree -Pid $process.Id
+        $killed = Stop-ProcessTree -TaskProcessId $process.Id
         if (-not $killed) {
             $cleanupWarnings.Add("Failed to fully kill child process tree for PID=$($process.Id)")
         }
@@ -247,6 +299,13 @@ finally {
         }
     }
 
+    if ($null -ne $boardLock) {
+        & $python.Source $boardScript unlock $boardResource --token $boardLock.token 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            $cleanupWarnings.Add("Could not release board lock '$boardResource'; it expires at $($boardLock.expires)")
+        }
+    }
+
     if ($cleanupWarnings.Count -gt 0) {
         Write-Warning "Cleanup warnings:"
         foreach ($w in $cleanupWarnings) {
@@ -270,9 +329,7 @@ finally {
 # raw tails: an agent reads it first and opens the full logs only if needed.
 # The summarizer is shared workspace tooling in Others/dev-utils; without it the
 # wrapper falls back to plain tails.
-$devUtilsRoot = if ($env:DEV_UTILS_ROOT) { $env:DEV_UTILS_ROOT } else { Join-Path $repoRoot "..\..\Others\dev-utils" }
 $summarizer = Join-Path $devUtilsRoot "summarize-run-log.py"
-$python = Get-Command python.exe -ErrorAction SilentlyContinue
 $summarized = $false
 
 if ($python -and (Test-Path -LiteralPath $summarizer)) {

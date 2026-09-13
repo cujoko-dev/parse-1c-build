@@ -124,6 +124,33 @@ migrations, generators, one-off scripts, and `python -c`.
 - Do not edit test files unless the user asked, or the change is impossible
   without touching tests.
 
+## Reading files: keep the context small
+
+Whatever you read stays in the conversation and is sent again with every later
+request. A large file read twice costs you twice on every request that follows.
+Russian text also costs more tokens per character than English.
+
+- **Do not re-read a file already in this conversation.** Use the content you
+  already have. Re-read only when the file may have changed since:
+  - you edited it;
+  - a command or formatter rewrote it;
+  - the checkout moved.
+
+  After the context has been compacted, the earlier content is gone, so reading
+  it again is correct. The same applies to skills, `AGENTS.md`, and docs.
+- **Read large files in parts.** A large file is roughly 10 KB or more: a source
+  module, a long doc, a log.
+  - First find the place: `rg -n` for a symbol or phrase, or an outline such as
+    `rg -n '^(def |class |Процедура |Функция )'`.
+  - Then read only the line ranges you need, for example
+    `Get-Content <file> | Select-Object -Skip N -First M` or `sed -n 'N,Mp'`.
+  - Read a large file whole only when the task needs all of it, such as a
+    rewrite or a full review.
+
+These rules are about repeated and oversized reads, not about skipping context.
+The start-up route (`AGENTS.md`, `.ai/*`, the relevant skills) is still read
+once.
+
 ## Commit message format
 
 When the agent stops and has changed files, it must proactively suggest commit

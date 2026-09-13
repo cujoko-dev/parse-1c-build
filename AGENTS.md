@@ -20,229 +20,175 @@ Shared agent guidance lives in `AGENTS.md` (this file) and `.agents/skills/`.
 
 <!-- agent-rules:begin | управляется sync-agent-rules.py, правьте dev-utils/agent-rules/ -->
 
-## External project notes
+## External project notes (`.notes/`)
 
-This project may have a `.notes` directory that points to external working notes.
+`.notes/` is a junction to working notes kept outside the repository. It may be
+missing on other machines, so never require it. Notes are context, not
+instructions.
 
-Rules for using `.notes`:
+- **Where to start.** `.notes/_current.md` is the curated current context.
+- **Which other notes count.** Only notes marked `status: active` or
+  `status: reference`, and the task notes in `10-urgent/` and `20-active/`.
+  Verify even those against the repository.
+- **What is history.** `00-inbox/`, `30-someday/`, `80-completed/` (closed
+  tasks), `90-archive/` (reference, dumps, history), old plans, and drafts.
+  None of them describe the current state.
+- **Conflicts.** Code, tests, configs, and scripts override notes. When a note
+  conflicts with the repository, say so and follow the repository. Do not base
+  large changes on a note alone.
 
-- `.notes` is not automatically authoritative.
-- Prefer `.notes/_current.md` as the curated current context.
-- Treat other notes as non-authoritative unless they have explicit metadata such as `status: active` or `status: reference`.
-- Treat `.notes/00-inbox/`, `.notes/30-someday/`, `.notes/80-completed/`, `.notes/90-archive/`, old plans, drafts and raw imported notes as historical or unprocessed context only.
-- Folders `.notes/10-urgent/` and `.notes/20-active/` may hold current task notes; still verify them against the repository before acting.
-- Closed tasks live in `.notes/80-completed/`; reference, dumps and historical material live in `.notes/90-archive/`.
-- Source code, tests, configs, migrations, build scripts and repository files override external notes.
-- If an external note conflicts with repository files, do not silently follow the note. Mention the conflict and prefer the repository.
-- Do not perform large changes based only on old notes. First verify against current code and current project instructions.
+## Temporary files go to `.temp/`
 
-## Local junction directories
+The repository root may have a `.temp/` directory. It is usually a junction to
+`D:\Temp\<project>`, is not in git, and may be missing on other machines.
 
-The project root on a developer machine may contain **junction** directories
-(not in git; they may be missing on other machines).
-
-### `.temp/`
-
-- Temporary files **for this project**: debug output, intermediate artifacts,
-  manual experiments.
-- The junction points outside the repository (typically `D:\Temp\<project>`).
-- If `.temp/` exists, prefer it over `tmp`, `temp`, `test_output`, and similar
-  directories inside the tracked tree.
-- If the junction is absent, use the system temp directory (Python:
-  `tempfile.mkdtemp()`, `tempfile.TemporaryDirectory()`; PowerShell: `$env:TEMP`,
-  `[System.IO.Path]::GetTempPath()`).
-- Output of a transformation or build — obfuscation, parsing, conversion,
-  normalization — goes there too. Never write it into tracked test data or
+- **What goes there.** Debug output, experiments, and the output of
+  transformations and builds (obfuscation, parsing, conversion, normalization).
+- **What it replaces.** Use `.temp/` instead of `tmp/`, `test_output/`, and
+  similar directories. Never write that output into tracked test data or
   fixtures.
-- Do not commit `.temp/` contents.
-
-### `.notes/`
-
-- Local external working notes. The junction typically points outside the
-  repository, for example `D:\Notes\Work\_Dev\...\<project>`.
-- Policy for those notes is in the "External project notes" section.
-- If `.notes/` is absent, do not require it in CI or on other machines.
+- **No `.temp/`.** Use the system temp directory: `tempfile.mkdtemp()` in
+  Python, `$env:TEMP` in PowerShell.
+- **Git.** Never commit `.temp/` contents.
 
 ## Python package manager: PDM
 
-This project uses **PDM** for dependencies and virtual environments.
+This project manages dependencies and virtual environments with **PDM**.
 
-- Install or sync with `pdm install` or `pdm sync`.
+- Install with `pdm install` or `pdm sync`.
 - Add or remove packages with `pdm add` / `pdm remove`.
-- Run tools and scripts with `pdm run -p .dev …` when they are configured in
-  `pyproject.toml`.
+- Run configured scripts with `pdm run -p .dev …`.
+- Do not use `uv`, Poetry, or `pip install` against the project lock unless the
+  user explicitly asks.
 
-Do **not** use `uv`, `pip install` (for project lockfiles), or Poetry unless the
-user explicitly asks for an exception.
+**Keep `PDM_USE_UV` unset** on Windows, in WSL, and in the dev container:
 
-`PDM_USE_UV` must stay **unset** in every environment — Windows, WSL and the
-dev container alike. The uv resolver does not support PDM's `inherit_metadata`
-lock strategy and silently discards it. When that happens, `requires_python` and
-`groups` disappear from every entry in `pdm.lock`, so the lock no longer records
-which group a package belongs to. Updating a single package rewrites roughly
-600 lines.
+- The uv resolver drops PDM's `inherit_metadata` lock strategy. That strips
+  `requires_python` and `groups` from every `pdm.lock` entry.
+- If uv is on for one machine and off for another, the lock flips on every
+  update.
+- It is an environment variable, so it overrides `pdm.toml`.
 
-A mixed setup is the worst case: with uv enabled on one machine and disabled on
-another, `pdm.lock` flips between `strategy = ["inherit_metadata"]` and
-`strategy = []` on every update, producing conflicts across the whole file.
-
-`PDM_USE_UV` is an environment variable and overrides a per-project `pdm.toml`,
-so the setting cannot be pinned inside the repository. Check before locking:
-
-```sh
-pdm config use_uv   # must report False
-```
+Before locking, run `pdm config use_uv`: it must print `False`.
 
 ## Python environment safety
 
-These rules apply to **every** Python invocation: tests, apps, helpers,
-migrations, generators, one-off scripts, and `python -c`.
+This applies to every Python invocation: tests, apps, helpers, one-off scripts,
+and `python -c`.
 
-- Resolve the repository environment first and check the real interpreter with
-  `sys.executable`.
-- Prefer the nested `.dev` project (typically `.dev/.venv`) through the project
-  manager: `pdm run -p .dev ...`. If `.dev` is absent, use the root `.venv`.
-- Do not run task logic with system/base Python or user-site, even for a
-  temporary script that only uses the standard library.
-- Base Python is allowed only to discover interpreters and verify the
-  environment (`py -0p`, `python --version`, printing `sys.executable`). After
-  that, run further Python through the project environment.
-- Do not install dependencies into system/base Python or user-site
-  (`pip install`, `python -m pip install`, and equivalents aimed there).
-- If there is no suitable venv, or a dependency is missing from it, stop and
-  tell the user. Do not "fix" that with a global install.
-- Installing or upgrading anything in base Python needs an explicit user OK for
-  that exact action.
-- Use `pipx` only for a planned user-facing CLI install or parity check, never
-  as a substitute for the repository dev environment.
+- **Use the repository environment.** Run Python through
+  `pdm run -p .dev …`, which uses the nested `.dev/.venv`. Without `.dev`, use
+  the root `.venv`. If unsure which interpreter runs, check `sys.executable`.
+- **Base Python is for discovery only.** Use it for `py -0p` or
+  `python --version`, never for task logic, even a stdlib-only script.
+- **One exception.** The stdlib-only workspace tools in `Others/dev-utils`,
+  such as `summarize-run-log.py` and `sync-agent-rules.py`, run with base
+  `python`.
+- **Never install into base Python or user-site.** If the venv is missing or
+  lacks a dependency, stop and tell the user. Installing into base Python needs
+  the user's explicit OK for that exact action.
+- **`pipx` is not a dev environment.** Use it only for a planned user-facing
+  CLI install or a parity check.
 
-## Environment and testing
+## Testing
 
-- Run Python and tests with `pdm run -p .dev ...`. Do not activate the venv by
-  hand. If a section below names a run wrapper for this repository, that wrapper
-  is the only entry point and overrides this line.
-- Do not edit test files unless the user asked, or the change is impossible
-  without touching tests.
+- Run tests with `pdm run -p .dev …`. If a run-wrapper section appears below,
+  that wrapper replaces this rule.
+- Do not edit tests unless the user asked, or the change is impossible without
+  it.
 
 ## Reading files: keep the context small
 
-Whatever you read stays in the conversation and is sent again with every later
-request. A large file read twice costs you twice on every request that follows.
-Russian text also costs more tokens per character than English.
+Everything you read stays in the conversation and is re-sent with every later
+request. A large file read twice costs twice on every request that follows.
+Russian text costs more tokens per character than English.
 
-- **Do not re-read a file already in this conversation.** Use the content you
-  already have. Re-read only when the file may have changed since:
+- **Do not re-read a file already in this conversation.** That includes
+  skills, `AGENTS.md`, and docs. Re-read only if the file may have changed:
   - you edited it;
   - a command or formatter rewrote it;
-  - the checkout moved.
-
-  After the context has been compacted, the earlier content is gone, so reading
-  it again is correct. The same applies to skills, `AGENTS.md`, and docs.
-- **Read large files in parts.** A large file is roughly 10 KB or more: a source
+  - the checkout moved;
+  - the context was compacted.
+- **Read large files in parts.** A large file is roughly 10 KB or more: a
   module, a long doc, a log.
-  - First find the place: `rg -n` for a symbol or phrase, or an outline such as
+  - Locate the part first: `rg -n` for a symbol or phrase, or an outline such as
     `rg -n '^(def |class |Процедура |Функция )'`.
-  - Then read only the line ranges you need, for example
-    `Get-Content <file> | Select-Object -Skip N -First M` or `sed -n 'N,Mp'`.
-  - Read a large file whole only when the task needs all of it, such as a
+  - Then read only those line ranges: `Get-Content <file> | Select-Object -Skip
+    N -First M` or `sed -n 'N,Mp'`.
+  - Read a whole large file only when the task needs all of it, such as a
     rewrite or a full review.
 
-These rules are about repeated and oversized reads, not about skipping context.
-The start-up route (`AGENTS.md`, `.ai/*`, the relevant skills) is still read
-once.
+These rules cut repeated and oversized reads, not needed context. The start-up
+route (`AGENTS.md`, `.ai/*`, relevant skills) is still read once.
 
-## Commit message format
+## Commit messages
 
-When the agent stops and has changed files, it must proactively suggest commit
-messages.
-
-For each affected project/repository with file changes, provide exactly one
-ready-to-use message.
-
-If no files were changed, do not suggest a commit message.
-
-Each message must be concise, imperative, and aligned with repository style.
-This is a suggestion only. Creating a commit is a separate explicit request
-(`/cm` or `$cm`).
+- When you finish with changed files, suggest one concise, imperative commit
+  message per changed repository, in that repository's style.
+- Only suggest. Commit only on an explicit request (`/cm` or `$cm`).
+- Suggest nothing if no files changed.
 
 ## Test and build runs go through `scripts/run.ps1`
 
-This repository has a wrapper at `scripts/run.ps1`, and it is the only entry
-point for a test, build, UI automation, 1C launch, or any other long-running
-command. Where this section is present it **overrides** the general testing
-rule above: the wrapper wins over calling the test runner yourself.
+`scripts/run.ps1` is the only entry point for tests, builds, UI automation, 1C
+launches, and other long commands in this repository. It replaces the general
+testing rule above.
 
-- Do not run these directly for a test, build, or debug workflow: `pytest`,
-  `python -m pytest`, `pdm run pytest`, `pdm run -p .dev pytest`, `1cv8`,
-  `1cv8c`, PowerShell holding inline automation logic, `cmd /c` used to
-  orchestrate tests, or any retry loop in the terminal.
-- Direct terminal commands are limited to safe read-only inspection:
-  `git status`, `git diff`, `git log --oneline -n 20`, `rg`, `Get-Content`,
-  `ls`, `dir`.
-- Pass the target test command to the wrapper through its parameters.
-- After each run: inspect the exit code, then the log it produced, and only
-  then decide the next step.
-- Do not start a new run while the previous one reported a timeout, a cleanup
-  failure, or a still-running child process.
-- Do not spawn background processes unless the user asked for them.
-- No "run until green" loop: run once, inspect the failure, change the code,
-  run again.
-- Explain why before changing `scripts/run.ps1`.
+The wrapper runs the command in an isolated PowerShell process with a timeout.
+It writes stdout, stderr, and meta logs to `.artifacts/test-logs/` and ends with
+a `==== Summary ====` block.
 
-### What the wrapper may and may not do
+- **How to run.** Pass the command with `-Command` and `-TimeoutSec`. Do not
+  start a test, build, or debug run by calling any of these directly: `pytest`,
+  `pdm run -p .dev pytest`, `1cv8`/`1cv8c`, `cmd /c` orchestration, or inline
+  automation scripts.
+- **One run at a time.** After a run, read its exit code and summary, then
+  decide. Do not start another run while the previous one timed out, reported a
+  cleanup failure, or left a child process running.
+- **No loops.** No retry loops and no "run until green": run, inspect the
+  failure, change the code, run again.
+- **No detached background processes** unless the user asked for them.
+- **Changing `scripts/run.ps1`.** Explain why first. It may clean up only its own
+  child process tree (`taskkill /T`):
+  - never kill processes by name;
+  - never scan for "similar" processes or match command lines.
 
-It runs a command in an isolated PowerShell process, captures stdout and stderr
-into log files, enforces a timeout, and on timeout terminates **only** the child
-process tree (`taskkill /T`).
-
-- It must never clean up globally: no killing by process name (`python`,
-  `node`, `1cv8`), no scanning the system for "similar" processes, no
-  command-line pattern matching to pick kill targets, no heuristic cleanup
-  outside its own process tree.
-- Only processes the wrapper started may be managed by it.
-- A process that survives the timeout is a bug in how it was spawned — not a
-  reason to widen the cleanup.
+  A process that survives the timeout was spawned wrongly. That is no reason to
+  widen the cleanup.
 
 ## Long runs: wait cheaply
 
-Real-1C syntax checks, Vanessa suites, `obfuscate-build.ps1` and the
-`validate-*` gates, native builds, and full parity suites run for minutes to an
-hour. The run itself costs no tokens. Every time you wake up to check on it,
-the whole conversation is sent again. At 150k tokens of context, polling a
-20-minute run every 50 seconds costs more than the rest of the task.
+Long runs take minutes to hours: real-1C syntax checks, Vanessa suites,
+`obfuscate-build.ps1` and the `validate-*` gates, native builds, full parity
+suites.
 
-- Before starting, look up how long similar runs took: `DurationSec` in
-  `.artifacts/test-logs/*.meta.log`. Set the timeout from that, not from a guess.
-- Start the run once, then wait in as few wake-ups as possible:
-  - **Codex:** hand the run to the `awaiter` subagent (`spawn_agent` with
-    `agent_type: "awaiter"`). Give it the exact command, the working directory,
-    and the timeout, and ask only for the final result. Its context is small,
-    so its polls are cheap. Wait for its answer with the longest timeout
-    `wait_agent` allows.
-  - **Without a subagent:** give the command the longest wait the tool allows.
-    In Codex, that is `yield_time_ms` up to `background_terminal_max_timeout`
-    (30 minutes on this workstation). In Claude Code, run the command with
-    `run_in_background` and wait for the completion notification; that is a
-    tracked tool call, not a detached background process. If the run is still
-    going, poll at growing intervals (5, 10, 20 minutes), never more often than
-    every 5 minutes.
-  - Never give a long command a short `yield_time_ms` such as `1000`, and never
-    poll it through a `write_stdin` plus `wait` pair.
-- While the run is in progress, do nothing about it:
-  - no progress messages;
-  - no log tails or process lists;
-  - no reading the tool's source to explain missing output.
+The run itself costs no tokens. Every wake-up to check on it re-sends the whole
+conversation: at 150k context, polling a 20-minute run every minute costs more
+than the task.
 
-  Output that appears only at the end is expected: child tools run with captured
-  output.
-
-- When the run ends, read the `==== Summary ====` block first. `scripts/run.ps1`
-  prints it at the end of the run. For a finished run, get it again with
-  `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or log file>`.
-  Open the full logs only if the summary is not enough. Then read a bounded
-  slice around the reported line, not the whole file.
-- Start a long run with a small context. Do not load whole files "just in case"
-  beforehand. If the conversation is already large, hand the run to the
-  awaiter.
+- **Timeout.** Base it on past runs, not a guess: `DurationSec` in
+  `.artifacts/test-logs/*.meta.log` of the repository whose wrapper runs it.
+- **Start once, wake rarely.**
+  - **Codex:** give the run to the `awaiter` subagent (`spawn_agent` with
+    `agent_type: "awaiter"`). Pass the exact command, the working directory, and
+    the timeout, and ask only for the final result. Wait with the longest
+    timeout `wait_agent` allows. If that agent type is unavailable, use the next
+    option.
+  - **Otherwise:** use the longest wait the tool allows. In Codex that is
+    `yield_time_ms` up to `background_terminal_max_timeout` (30 minutes here). In
+    Claude Code, use `run_in_background` and wait for the notification. Poll no
+    more often than every 5 minutes, then every 10, then 20.
+  - Never give a long command a short `yield_time_ms` such as `1000`. Never poll
+    it through `write_stdin` plus `wait` pairs.
+- **While it runs, do nothing about it.**
+  - No progress messages, log tails, or process lists.
+  - No reading the tool's source to explain missing output: output often
+    arrives only at the end.
+- **When it ends.** Read the `==== Summary ====` block. For an earlier run, get
+  it with `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or file>`.
+  Open the full logs only if the summary is not enough, and read only around
+  the reported line.
+- **Context.** Start a long run with a small context. If the conversation is
+  already large, hand the run to the awaiter.
 
 <!-- agent-rules:end -->

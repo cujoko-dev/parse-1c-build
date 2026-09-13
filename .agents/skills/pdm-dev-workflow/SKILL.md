@@ -1,27 +1,22 @@
 ---
 name: pdm-dev-workflow
 description: >-
-  PDM и вложенный проект `.dev`: установка зависимостей, запуск pytest и скриптов через
-  `pdm run -p .dev` без активации venv. Use when the repository has `.dev/pyproject.toml`
-  and the task touches Python, dependencies, or tests.
+  PDM with a nested `.dev` project: installing dependencies and running tests
+  or scripts via `pdm run -p .dev` without activating the venv. Use when the
+  repository has `.dev/pyproject.toml` and the task touches Python,
+  dependencies, or tests.
 ---
 
-# PDM и каталог `.dev`
+# PDM and the `.dev` project
 
-## Структура
-
-В корне — основной `pyproject.toml` пакета. Разработческое окружение (pytest, инструменты) задаётся во **вложенном** проекте **`.dev/pyproject.toml`**. Его скрипты и команды запускают через **`pdm run -p .dev …`** (`-p` — путь к каталогу с dev-`pyproject.toml`).
-
-## Команды
-
-- Зависимости из корня: `pdm install` или `pdm sync` (см. раздел PDM в `AGENTS.md`).
-- Тесты и скрипты из `[tool.pdm.scripts]` dev-проекта: например `pdm run -p .dev test`, `pdm run -p .dev pytest …`.
-- Не рассчитывать на ручную активацию виртуального окружения: используй `pdm run -p .dev …`.
-
-## Терминал
-
-Если в репозитории есть `scripts/run.ps1` (ctl-1c, codemask-1c и т.п.), команды гоняй через него — см. `terminal-test-execution-policy.mdc`. Иначе выполняй `pdm` из корня репозитория.
-
-## Ограничения
-
-Не подменять управление зависимостями на `uv`, произвольный `pip install` для lockfile проекта или Poetry — см. раздел PDM в `AGENTS.md`.
+- The root `pyproject.toml` is the package.
+- Development tools (pytest, scripts in `[tool.pdm.scripts]`) live in the nested
+  `.dev/pyproject.toml`, with its own lock and `.dev/.venv`.
+- Runtime dependencies: `pdm install` or `pdm sync` from the root.
+- Dev dependencies: `pdm install -p .dev`.
+- Run tests and dev scripts with `pdm run -p .dev <script>` or
+  `pdm run -p .dev pytest …`. Never activate the venv by hand.
+- If the repository has `scripts/run.ps1`, run tests and builds through it. See
+  "Test and build runs go through `scripts/run.ps1`" in `AGENTS.md`.
+- No `uv`, Poetry, or ad-hoc `pip install` for the project lock. See "Python
+  package manager: PDM" in `AGENTS.md`.

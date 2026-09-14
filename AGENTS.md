@@ -90,6 +90,17 @@ and `python -c`.
 - **`pipx` is not a dev environment.** Use it only for a planned user-facing
   CLI install or a parity check.
 
+## Ruff after Python edits
+
+Ruff is a user-level CLI on PATH (`pipx install ruff`), not a project dependency.
+
+- After you change Python files, run `ruff check --fix` and `ruff format` on
+  **those files only**, from the repository root so `[tool.ruff]` is picked up.
+- Do not lint the whole tree unless the user asked.
+- If `ruff` is missing from PATH, skip it and tell the user. Do not
+  `pdm add` / `pip install` ruff, and do not install it into a venv.
+- If ruff rewrote a file, re-read only that file before continuing.
+
 ## Testing
 
 - Run tests with `pdm run -p .dev …`. If a run-wrapper section appears below,
@@ -117,92 +128,8 @@ Russian text costs more tokens per character than English.
     N -First M` or `sed -n 'N,Mp'`.
   - Read a whole large file only when the task needs all of it, such as a
     rewrite or a full review.
-- **Shared rules block in `AGENTS.md`.** The part between
-  `<!-- agent-rules:begin` and `<!-- agent-rules:end -->` is generated from
-  shared fragments, so a section with the same heading has the same text in
-  every repository.
-  - In the first repository you work in, read `AGENTS.md` whole.
-  - In the next ones, read the local part outside the block. Then list the
-    block's headings with `rg -n '^## ' AGENTS.md` and read only the sections
-    you have not seen yet.
-
-These rules cut repeated and oversized reads, not needed context. The start-up
-route (`AGENTS.md`, `.ai/*`, relevant skills) is still read once.
-
-## Commit messages
-
-- When you finish with changed files, suggest one concise, imperative commit
-  message per changed repository, in that repository's style.
-- Only suggest. Commit only on an explicit request (`/cm` or `$cm`).
-- Suggest nothing if no files changed.
-
-## Test and build runs go through `scripts/run.ps1`
-
-`scripts/run.ps1` is the only entry point for tests, builds, UI automation, 1C
-launches, and other long commands in this repository. It replaces the general
-testing rule above.
-
-The wrapper runs the command in an isolated PowerShell process with a timeout.
-It writes stdout, stderr, and meta logs to `.artifacts/test-logs/` and ends with
-a `==== Summary ====` block.
-
-- **How to run.** Pass the command with `-Command` and `-TimeoutSec`. Do not
-  start a test, build, or debug run by calling any of these directly: `pytest`,
-  `pdm run -p .dev pytest`, `1cv8`/`1cv8c`, `cmd /c` orchestration, or inline
-  automation scripts.
-- **One run at a time.** After a run, read its exit code and summary, then
-  decide. Do not start another run while the previous one timed out, reported a
-  cleanup failure, or left a child process running.
-- **No loops.** No retry loops and no "run until green": run, inspect the
-  failure, change the code, run again.
-- **No detached background processes** unless the user asked for them.
-- **Changing `scripts/run.ps1`.** Explain why first. It may clean up only its own
-  child process tree (`taskkill /T`):
-  - never kill processes by name;
-  - never scan for "similar" processes or match command lines.
-
-  A process that survives the timeout was spawned wrongly. That is no reason to
-  widen the cleanup.
-
-## Long runs: wait cheaply
-
-Long runs take minutes to hours: real-1C syntax checks, Vanessa suites,
-`obfuscate-build.ps1` and the `validate-*` gates, native builds, full parity
-suites.
-
-The run itself costs no tokens. Every wake-up to check on it re-sends the whole
-conversation: at 150k context, polling a 20-minute run every minute costs more
-than the task.
-
-- **Timeout.** Base it on past runs, not a guess: `DurationSec` in
-  `.artifacts/test-logs/*.meta.log` of the repository whose wrapper runs it.
-- **Short runs.** A run expected to take under about 5 minutes needs none of
-  this. Call it directly and wait within one tool call: a subagent for a
-  30-second run costs more than it saves.
-- **Start once, wake rarely.**
-  - **Codex:** give the run to the `awaiter` subagent (`spawn_agent` with
-    `agent_type: "awaiter"`). Pass the exact command, the working directory, and
-    the timeout, and ask only for the final result. Wait with the longest
-    timeout `wait_agent` allows. If that agent type is unavailable, use the next
-    option.
-  - **Otherwise:** use the longest wait the tool allows. In Codex that is
-    `yield_time_ms` up to `background_terminal_max_timeout` (30 minutes here). In
-    Claude Code, use `run_in_background` and wait for the notification. Poll no
-    more often than every 5 minutes, then every 10, then 20.
-  - Never give a long command a short `yield_time_ms` such as `1000`. Never poll
-    it through `write_stdin` plus `wait` pairs.
-- **While it runs, do nothing about it.**
-  - No progress messages, log tails, or process lists.
-  - No reading the tool's source to explain missing output: output often
-    arrives only at the end.
-- **When it ends.** Read the `==== Summary ====` block. For an earlier run, get
-  it with `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or file>`.
-  Open the full logs only if the summary is not enough, and read only around
-  the reported line.
-- **Context.** Start a long run with a small context. If the conversation is
-  already large, hand the run to the awaiter.
-
-<!-- agent-rules:end -->` is generated from
+- **Shared rules block in `AGENTS.md`.** The part between the
+  `agent-rules:begin` and `agent-rules:end` markers is generated from
   shared fragments, so a section with the same heading has the same text in
   every repository.
   - In the first repository you work in, read `AGENTS.md` whole.

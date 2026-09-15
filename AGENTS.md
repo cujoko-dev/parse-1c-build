@@ -20,6 +20,26 @@ Shared agent guidance lives in `AGENTS.md` (this file) and `.agents/skills/`.
 
 <!-- agent-rules:begin | управляется sync-agent-rules.py, правьте dev-utils/agent-rules/ -->
 
+## Workspace map: route before scanning
+
+This checkout is one repository in a polyrepo. Sibling directories are
+other products, not the rest of this project.
+
+If the task may leave this repository, or you do not know which
+checkouts to open:
+
+1. Prefer the `cujoko-dev` MCP (`route_task`, then `get_system` /
+   `get_repo` if you still need detail). Open only the repos it names,
+   plus `Others/dev-utils`.
+2. If that MCP is not available, read `.ai/projects.md` and the
+   matching `.ai/systems/<id>.md` at the workspace root (`C:\Dev` or
+   `/workspaces`). Do not scan the tree to find products.
+3. Read the local `AGENTS.md` of each repository you are about to
+   change. The MCP does not include PDM, tests, or run wrappers.
+
+`.ai/` markdown is canonical; the MCP parses it. Do not duplicate the
+map here.
+
 ## External project notes (`.notes/`)
 
 `.notes/` is a junction to working notes kept outside the repository. It may be
@@ -137,8 +157,10 @@ Russian text costs more tokens per character than English.
     block's headings with `rg -n '^## ' AGENTS.md` and read only the sections
     you have not seen yet.
 
-These rules cut repeated and oversized reads, not needed context. The start-up
-route (`AGENTS.md`, `.ai/*`, relevant skills) is still read once.
+These rules cut repeated and oversized reads, not needed context. Route the
+task first (`cujoko-dev` MCP, or `.ai/projects.md` if it is missing), then
+read this repository's `AGENTS.md` and only the skills the task needs.
+Do not load `.ai/*` in full when the MCP already answered.
 
 ## Commit messages
 

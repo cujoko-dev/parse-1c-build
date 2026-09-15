@@ -58,4 +58,8 @@ rust/**/target/
 # checkout только там, где включён core.symlinks, а это настройка установщика,
 # а не репозитория.
 .claude/skills/
+# .claude/worktrees/<name> — worktree, которые создаёт Claude Code. Это полные
+# копии репозитория со своим .git: без записи git status в основной копии
+# показывает их как неотслеживаемые, а git add . добавляет как вложенный репозиторий.
+.claude/worktrees/
 # agent-rules:end

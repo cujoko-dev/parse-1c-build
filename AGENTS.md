@@ -162,6 +162,56 @@ task first (`cujoko-dev` MCP, or `.ai/projects.md` if it is missing), then
 read this repository's `AGENTS.md` and only the skills the task needs.
 Do not load `.ai/*` in full when the MCP already answered.
 
+## Shared agent board
+
+Other agents (Codex, Claude Code, Cursor) may be working on the same repositories
+right now. The board is a small shared space for what they need from each other.
+Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
+
+- **At the start.** When you begin work in a repository, run
+  `board.py read --repo <path relative to C:\Dev>`. Use `Python/codemask-1c-core`
+  or `Docker/cujoko-dev`, not the directory name alone: `cujoko-dev` exists
+  in several domains. It prints about 1 KB:
+  - resource locks;
+  - open posts.
+
+  Repeat `--repo` on `post` when the note belongs to several checkouts. Use
+  `*` only when it is truly workspace-wide.
+
+  Entries marked `STALE?` refer to files that changed since the post.
+
+- **Posts are claims, not facts.** Verify a post before relying on it. When a
+  post conflicts with the code, the code wins.
+- **What to post.** Post only what another agent would otherwise rediscover or
+  collide with. Keep a post under 1500 characters, and give evidence (a
+  command, log, or commit).
+  - `finding`: a non-obvious fact. Pass `--paths` with the files it depends on,
+    so the post goes stale when they change.
+  - `status`: work you leave unfinished or uncommitted.
+  - `question`: something you are blocked on.
+  - `decision`: a choice other agents must follow. Use `--supersedes <id>` to
+    replace an older post.
+  - `handoff`: multi-step work another session should continue. The handoff
+    text lives on the board, not in `.notes/`. Write it to a temp file,
+    starting with a summary. Post it with `--body-file` (up to 30000
+    characters). It stays open until someone resolves it; the next agent reads
+    it with `board.py show <id>`.
+- **Who writes.** Pass `--author` with your tool name. Resolve your own posts
+  with `board.py resolve <id>` once they no longer hold.
+- **Finishing a handoff.** When you finish the work it hands over:
+  1. Move what must outlast the task into the project's `.notes/_current.md` or
+     the repository docs. That means the current state, decisions, and open
+     problems, not the history of steps.
+  2. Resolve the handoff.
+
+  If you finish only part, post an updated handoff with `--supersedes <id>`.
+
+- **1C lock.** `scripts/run.ps1` takes the machine-wide `1c` lock on its own for
+  commands that drive 1C. If it exits with 75, another run holds 1C:
+  - do not retry in a loop;
+  - wait with `-LockWaitSec`;
+  - or pass `-Lock none` if the command does not touch 1C.
+
 ## Commit messages
 
 - When you finish with changed files, suggest one concise, imperative commit

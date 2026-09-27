@@ -145,7 +145,7 @@ Russian text costs more tokens per character than English.
   - Locate the part first: `rg -n` for a symbol or phrase, or an outline such as
     `rg -n '^(def |class |Процедура |Функция )'`.
   - Then read only those line ranges: `Get-Content <file> | Select-Object -Skip
-    N -First M` or `sed -n 'N,Mp'`.
+N -First M` or `sed -n 'N,Mp'`.
   - Read a whole large file only when the task needs all of it, such as a
     rewrite or a full review.
 - **Shared rules block in `AGENTS.md`.** The part between the
@@ -211,6 +211,30 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
   - do not retry in a loop;
   - wait with `-LockWaitSec`;
   - or pass `-Lock none` if the command does not touch 1C.
+
+## Working style
+
+- **Ground answers in evidence.** Answer from the real code, config, logs, or
+  live state, not from README-level guesses. Keep "already done" separate
+  from "still to do".
+- **Finish the job.** Once the direction is settled, implement it, verify it
+  in the real repository or environment, and name exact blockers. Keep the
+  intended workflow; do not swap in a workaround and stop there.
+- **Observe before changing.** For "what happened?" or "why does X?"
+  questions, gather evidence and explain first. Stay read-only unless asked
+  to fix.
+- **Live incidents.** Start from the exact error text, act in the environment
+  directly, and re-check after each fix.
+- **Rule and policy rollouts.** Cover the whole repository family unless the
+  user narrows the scope, but check per repository whether the rule applies.
+  Change shared agent rules in their canon (`Others/dev-utils/agent-rules`),
+  so Codex, Claude Code, and Cursor all get them.
+- **Verdicts.** For trust or production-readiness reviews, say plainly
+  whether it can be trusted and list the blockers. Classify feature claims as
+  present, partial, or absent, and mark inference versus assumption. Judge
+  service boundaries by dependencies and call paths, not by repository names.
+- **Validation entry points.** Expose checks such as syntax checks and dry
+  runs as discoverable CLI options or menu items, not hidden internal steps.
 
 ## Commit messages
 

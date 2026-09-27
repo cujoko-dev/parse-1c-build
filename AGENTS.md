@@ -144,8 +144,8 @@ Russian text costs more tokens per character than English.
   module, a long doc, a log.
   - Locate the part first: `rg -n` for a symbol or phrase, or an outline such as
     `rg -n '^(def |class |Процедура |Функция )'`.
-  - Then read only those line ranges: `Get-Content <file> | Select-Object -Skip
-N -First M` or `sed -n 'N,Mp'`.
+  - Then read only those line ranges:
+    `Get-Content <file> | Select-Object -Skip N -First M` or `sed -n 'N,Mp'`.
   - Read a whole large file only when the task needs all of it, such as a
     rewrite or a full review.
 - **Shared rules block in `AGENTS.md`.** The part between the

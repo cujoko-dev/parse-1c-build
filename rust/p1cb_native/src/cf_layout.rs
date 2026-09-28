@@ -36,6 +36,12 @@ static RE_OBJECT_NAME: Lazy<Regex> =
 static RE_CONFIG_IDENTITY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"\{[01],0,([0-9a-fA-F-]{36})\},"([^"]+)""#).unwrap());
 
+// Корень расширения (.cfe) в configinfo: `{2,<uuid>,`
+static RE_CONFIGINFO_ROOT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"\{2,([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}),")
+        .unwrap()
+});
+
 pub const CF_OBJECTS_FILENAME: &str = "cfobjects.txt";
 
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
@@ -173,7 +179,24 @@ fn name_from_text(text: &str, object_uuid: &str) -> String {
 fn config_uuid_from_root(dump_dir: &Path) -> Result<String, String> {
     let root_path = dump_dir.join("root");
     if !root_path.is_file() {
-        return Err(format!("CF dump has no root file: '{}'", dump_dir.display()));
+        // Расширение (.cfe) хранит корень в configinfo, а не в root.
+        let configinfo_path = dump_dir.join("configinfo");
+        if !configinfo_path.is_file() {
+            return Err(format!(
+                "CF dump has neither root nor configinfo file: '{}'",
+                dump_dir.display()
+            ));
+        }
+        let text = read_text(&configinfo_path).map_err(|e| e.to_string())?;
+        return RE_CONFIGINFO_ROOT
+            .captures(&text)
+            .map(|caps| caps.get(1).unwrap().as_str().to_lowercase())
+            .ok_or_else(|| {
+                format!(
+                    "Cannot find extension root UUID in '{}'",
+                    configinfo_path.display()
+                )
+            });
     }
     let text = read_text(&root_path).map_err(|e| e.to_string())?;
     RE_UUID

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from parse_1c_build import bsl
+from parse_1c_build import bsl, configinfo
 from parse_1c_build.metadata_types import (
     CONFIG_MODULE_SLOTS,
     CONFIGURATION_TYPE_UUID,
@@ -139,7 +139,18 @@ def _name_from_text(text: str, object_uuid: str) -> str:
 def _config_uuid_from_root(dump_dir: Path) -> str:
     root_path = dump_dir / "root"
     if not root_path.is_file():
-        raise Exception(f"CF dump has no root file: '{dump_dir}'")
+        # Расширение (.cfe) хранит корень в configinfo, а не в root.
+        configinfo_path = dump_dir / configinfo.FILE_NAME
+        if not configinfo_path.is_file():
+            raise configinfo.ConfigInfoError(
+                f"CF dump has neither root nor configinfo file: '{dump_dir}'"
+            )
+        uuid = configinfo.root_uuid(_read_text(configinfo_path))
+        if uuid is None:
+            raise configinfo.ConfigInfoError(
+                f"Cannot find extension root UUID in '{configinfo_path}'"
+            )
+        return uuid
     m = _RE_UUID.search(_read_text(root_path))
     if not m:
         raise Exception(f"Cannot find configuration UUID in '{root_path}'")

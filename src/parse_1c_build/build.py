@@ -5,7 +5,7 @@ from pathlib import Path
 from loguru import logger
 import questionary
 
-from parse_1c_build import bsl, cf_layout
+from parse_1c_build import bsl, cf_layout, configinfo
 from parse_1c_build.base import (
     EXTENSIONS_CF_CFE,
     EXTENSIONS_EPF_ERF,
@@ -170,7 +170,81 @@ class Builder(Processor):
             args.append("--force")
         args += ["-B", str(source_dir), str(output_file_path)]
         check_silent(args)
+        if (source_dir / configinfo.FILE_NAME).is_file():
+            self._refresh_configinfo_hashes(
+                source_dir, source_dir == input_dir_path, output_file_path
+            )
         logger.info(f"'{output_file_path}' built from '{input_dir_path}'")
+
+    def _unpack_blocks(self, container_path: Path, output_dir: Path) -> None:
+        check_silent(
+            [
+                str(self.get_v8_unpack_file_path()),
+                "-U",
+                str(container_path),
+                str(output_dir),
+            ]
+        )
+
+    def _refresh_configinfo_hashes(
+        self,
+        source_dir: Path,
+        source_is_input: bool,
+        output_file_path: Path,
+    ) -> None:
+        """Пересчитывает таблицу хешей configinfo расширения по собранному контейнеру.
+
+        Хеши — base64(SHA1) сжатых блоков (`v8unpack -U`), поэтому сначала контейнер
+        собирается как есть, затем configinfo обновляется и контейнер собирается
+        ещё раз. Сжатие детерминировано: блоки остальных файлов не меняются, что
+        проверяется повторной распаковкой. Каталог исходников пользователя не
+        меняется: при сборке из него правится временная копия.
+
+        Конфигуратор 8.3.27 при `/LoadCfg -Extension` таблицу не сверяет (проверено
+        на фикстурах CodeMask), но контейнер остаётся таким, каким его пишет
+        платформа: другие загрузчики расширений не проверялись.
+        """
+        temp_parent = Path(tempfile.mkdtemp())
+        try:
+            self._unpack_blocks(output_file_path, temp_parent / "blocks")
+            text = configinfo.read_text(source_dir / configinfo.FILE_NAME)
+            names = [name for name, _ in configinfo.entries(text)]
+            hashes = configinfo.hashes_from_unpacked(temp_parent / "blocks", names)
+            refreshed = configinfo.with_hashes(text, hashes)
+            if refreshed == text:
+                return
+            if source_is_input:
+                build_dir = temp_parent / "source"
+                shutil.copytree(source_dir, build_dir)
+            else:
+                build_dir = source_dir
+            configinfo.write_text_like(build_dir / configinfo.FILE_NAME, refreshed)
+            check_silent(
+                [
+                    str(self.get_v8_unpack_file_path()),
+                    "--force",
+                    "-B",
+                    str(build_dir),
+                    str(output_file_path),
+                ]
+            )
+            self._unpack_blocks(output_file_path, temp_parent / "check")
+            actual = configinfo.hashes_from_unpacked(temp_parent / "check", names)
+            if actual != hashes:
+                changed = sorted(name for name in names if actual[name] != hashes[name])
+                raise configinfo.ConfigInfoError(
+                    "Блоки контейнера изменились при повторной сборке: "
+                    + ", ".join(changed)
+                )
+            logger.info(
+                "configinfo: пересчитаны хеши {} из {} файлов",
+                sum(
+                    1 for name, old in configinfo.entries(text) if hashes[name] != old
+                ),
+                len(names),
+            )
+        finally:
+            shutil.rmtree(temp_parent, ignore_errors=True)
 
     def _run_md_ert_build(
         self,

@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 
 from parse_1c_build import parse
-from parse_1c_build.cli import get_argparser
 from parse_1c_build.cf_layout import (
     _extract_object_modules,
     _extract_plain_module,
 )
+from parse_1c_build.cli import get_argparser
 from parse_1c_build.parse import run as parse_run
 
 
@@ -46,8 +46,7 @@ def test_object_command_uses_name_from_object_descriptor(tmp_path: Path) -> None
     command_dir = bin_dir / f"{command_uuid}.2"
     command_dir.mkdir(parents=True)
     (bin_dir / object_uuid).write_text(
-        f'{{0,0,{object_uuid}}},"Object",'
-        f'{{0,0,{command_uuid}}},"ВнешнийДоступ"',
+        f'{{0,0,{object_uuid}}},"Object",{{0,0,{command_uuid}}},"ВнешнийДоступ"',
         encoding="utf-8",
     )
     (command_dir / "text").write_text(
@@ -60,11 +59,8 @@ def test_object_command_uses_name_from_object_descriptor(tmp_path: Path) -> None
 
     assert (tmp_path / "2_ВнешнийДоступ.bsl").is_file()
     assert not (tmp_path / "2_38d92d75.bsl").exists()
-    assert (
-        tmp_path / "meta" / "bsl_renames.txt"
-    ).read_text(encoding="utf-8") == (
-        "2_ВнешнийДоступ.bsl --> "
-        f"bin/{command_uuid}.2/text\n"
+    assert (tmp_path / "meta" / "bsl_renames.txt").read_text(encoding="utf-8") == (
+        f"2_ВнешнийДоступ.bsl --> bin/{command_uuid}.2/text\n"
     )
 
 
@@ -95,3 +91,41 @@ def test_parser_logs_start_before_dispatch(tmp_path: Path, monkeypatch) -> None:
         ),
         ("dispatch", (input_file, output_dir, False)),
     ]
+
+
+def test_cfu_is_routed_to_dedicated_handler(tmp_path: Path, monkeypatch) -> None:
+    input_file = tmp_path / "update.cfu"
+    output_dir = tmp_path / "update_cfu_src"
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        parse.Parser,
+        "_run_cfu",
+        lambda self, input_path, output_path, raw: calls.append(
+            (input_path, output_path, raw)
+        ),
+    )
+
+    parser = object.__new__(parse.Parser)
+    parser.run(input_file, output_dir, raw=False)
+
+    assert calls == [(input_file, output_dir, False)]
+
+
+def test_run_cfu_forces_raw_unpack(tmp_path: Path, monkeypatch) -> None:
+    """A CFU is a delta container: it must be unpacked raw regardless of the
+    requested raw flag, and cf_layout organize/split must never run."""
+    input_file = tmp_path / "update.cfu"
+    output_dir = tmp_path / "update_cfu_src"
+    unpack_calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        parse.Parser,
+        "_run_v8unpack_parse",
+        lambda self, input_path, output_path, raw: unpack_calls.append(
+            (input_path, output_path, raw)
+        ),
+    )
+
+    parser = object.__new__(parse.Parser)
+    parser._run_cfu(input_file, output_dir, raw=False)
+
+    assert unpack_calls == [(input_file, output_dir, True)]

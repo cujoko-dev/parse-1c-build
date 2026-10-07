@@ -61,13 +61,19 @@ def compare_raw_dirs(ref_dir: Path, other_dir: Path):
 def _format_raw_diff_report(cmp: dict) -> str:
     lines = []
     if cmp["only_in_ref"]:
-        lines.append("Только в образце: " + ", ".join(str(p) for p in cmp["only_in_ref"]))
+        lines.append(
+            "Только в образце: " + ", ".join(str(p) for p in cmp["only_in_ref"])
+        )
     if cmp["only_in_other"]:
-        lines.append("Только в полученном: " + ", ".join(str(p) for p in cmp["only_in_other"]))
+        lines.append(
+            "Только в полученном: " + ", ".join(str(p) for p in cmp["only_in_other"])
+        )
     for rel, rlen, olen, offset, rb, ob in cmp["differing"]:
         detail = f"  {rel}: размеры {rlen} vs {olen}"
         if offset >= 0:
-            detail += f", первый различающийся байт @{offset}: образец={rb!r}, получен={ob!r}"
+            detail += (
+                f", первый различающийся байт @{offset}: образец={rb!r}, получен={ob!r}"
+            )
         lines.append(detail)
     return "\n".join(lines)
 
@@ -115,9 +121,7 @@ def test_build_roundtrip_raw_sources_identical(test, tmpdir):
 
     cmp = compare_raw_dirs(reference_raw, raw_from_built)
     has_diff = (
-        bool(cmp["only_in_ref"])
-        or bool(cmp["only_in_other"])
-        or bool(cmp["differing"])
+        bool(cmp["only_in_ref"]) or bool(cmp["only_in_other"]) or bool(cmp["differing"])
     )
 
     if has_diff:
@@ -230,6 +234,24 @@ def test_builder_logs_start_before_dispatch(tmp_path: Path, monkeypatch) -> None
         ),
         ("dispatch", (input_dir, output_file)),
     ]
+
+
+def test_cfu_build_is_routed_to_dedicated_handler(tmp_path: Path, monkeypatch) -> None:
+    input_dir = tmp_path / "update_cfu_src"
+    output_file = tmp_path / "update.cfu"
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        build.Builder,
+        "_run_cfu_build",
+        lambda self, input_path, output_path, force=False: calls.append(
+            (input_path, output_path, force)
+        ),
+    )
+
+    builder = object.__new__(build.Builder)
+    builder.run(input_dir, output_file)
+
+    assert calls == [(input_dir, output_file, False)]
 
 
 @pytest.mark.parametrize("do_not_backup", [False, True])

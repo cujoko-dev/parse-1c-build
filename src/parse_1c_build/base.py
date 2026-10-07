@@ -8,7 +8,12 @@ from parse_1c_build.__about__ import APP_AUTHOR, APP_NAME
 # File extensions for containers handled by Parser and Builder.
 EXTENSIONS_EPF_ERF = (".epf", ".erf")
 EXTENSIONS_CF_CFE = (".cf", ".cfe")
-EXTENSIONS_V8UNPACK = EXTENSIONS_EPF_ERF + EXTENSIONS_CF_CFE
+# Configuration update files (.cfu). The outer container is the same v8 format,
+# so v8unpack parses/builds it, but inside it is a delta (metadata + full images
+# of changed objects), not a CF layout. It is therefore handled raw only: no
+# cf_layout organize/split on parse, no configinfo on build.
+EXTENSIONS_CFU = (".cfu",)
+EXTENSIONS_V8UNPACK = EXTENSIONS_EPF_ERF + EXTENSIONS_CF_CFE + EXTENSIONS_CFU
 EXTENSIONS_MD_ERT = (".md", ".ert")
 
 USE_READER_DEPRECATED_MSG = (
@@ -105,10 +110,7 @@ def add_generic_arguments(subparser) -> None:
         "-u",
         "--use-reader",
         action="store_true",
-        help=(
-            "Deprecated; will be removed. "
-            "Parse or build .epf/.erf with V8Reader"
-        ),
+        help=("Deprecated; will be removed. Parse or build .epf/.erf with V8Reader"),
     )
 
     # todo Добавить help

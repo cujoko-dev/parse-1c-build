@@ -2,12 +2,13 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from loguru import logger
 import questionary
+from loguru import logger
 
 from parse_1c_build import bsl, cf_layout, configinfo
 from parse_1c_build.base import (
     EXTENSIONS_CF_CFE,
+    EXTENSIONS_CFU,
     EXTENSIONS_EPF_ERF,
     EXTENSIONS_MD_ERT,
     EXTENSIONS_V8UNPACK,
@@ -23,7 +24,9 @@ ERR_CWD_INPUTS_NOT_FOUND = (
     "(*_epf_src, *_erf_src, *_cf_src, *_cfe_src, …) "
     "в текущем каталоге (и подкаталогах). Укажите каталог или используйте -i"
 )
-ERR_INTERACTIVE_NOT_FOUND = "Не найдено подходящих входных каталогов для интерактивного выбора"
+ERR_INTERACTIVE_NOT_FOUND = (
+    "Не найдено подходящих входных каталогов для интерактивного выбора"
+)
 ERR_INTERACTIVE_CANCELLED = "Интерактивный выбор отменен пользователем"
 
 
@@ -34,7 +37,11 @@ def _resolve_output_path(
     """Resolve output file path from input dir and optional output path."""
     if output_path is not None and not output_path.is_dir():
         return output_path
-    parent = output_path if (output_path is not None and output_path.is_dir()) else input_dir_path.parent
+    parent = (
+        output_path
+        if (output_path is not None and output_path.is_dir())
+        else input_dir_path.parent
+    )
     # input_dir_path.name is like "name_epf_src" or "name_ert_src"
     name_with_ext = input_dir_path.name.rpartition("_")[0]
     name, _, ext = name_with_ext.rpartition("_")
@@ -82,7 +89,9 @@ def _input_dirs_select_interactive(input_dirs: list[Path]) -> list[Path]:
                 )
                 for path in input_dirs
             ],
-            validate=lambda value: "Выберите хотя бы один каталог" if not value else True,
+            validate=lambda value: (
+                "Выберите хотя бы один каталог" if not value else True
+            ),
             qmark="build",
         ).ask()
     except KeyboardInterrupt as exc:
@@ -155,9 +164,7 @@ class Builder(Processor):
         """Build CF/CFE from organized or raw source directory via v8unpack -B."""
         if self.use_reader:
             self.warn_use_reader_deprecated(logger)
-            logger.warning(
-                "--use-reader is ignored for .cf/.cfe; using v8unpack"
-            )
+            logger.warning("--use-reader is ignored for .cf/.cfe; using v8unpack")
         if cf_layout.has_cf_layout(input_dir_path):
             temp_parent = Path(tempfile.mkdtemp())
             source_dir = cf_layout.prepare_configuration_for_build(
@@ -174,6 +181,22 @@ class Builder(Processor):
             self._refresh_configinfo_hashes(
                 source_dir, source_dir == input_dir_path, output_file_path
             )
+        logger.info(f"'{output_file_path}' built from '{input_dir_path}'")
+
+    def _run_cfu_build(
+        self,
+        input_dir_path: Path,
+        output_file_path: Path,
+        force: bool = False,
+    ) -> None:
+        """Build CFU from a raw source directory via v8unpack -B. A CFU is a
+        delta container, not a CF layout, so there is no cf_layout assembly and
+        no configinfo refresh."""
+        args = [str(self.get_v8_unpack_file_path())]
+        if force:
+            args.append("--force")
+        args += ["-B", str(input_dir_path), str(output_file_path)]
+        check_silent(args)
         logger.info(f"'{output_file_path}' built from '{input_dir_path}'")
 
     def _unpack_blocks(self, container_path: Path, output_dir: Path) -> None:
@@ -238,9 +261,7 @@ class Builder(Processor):
                 )
             logger.info(
                 "configinfo: пересчитаны хеши {} из {} файлов",
-                sum(
-                    1 for name, old in configinfo.entries(text) if hashes[name] != old
-                ),
+                sum(1 for name, old in configinfo.entries(text) if hashes[name] != old),
                 len(names),
             )
         finally:
@@ -270,7 +291,11 @@ class Builder(Processor):
     ) -> None:
         """Собирает обработку из исходных файлов"""
         output_file_path = _resolve_output_path(input_dir_path, output_path)
-        if not do_not_backup and output_file_path.exists() and output_file_path.is_file():
+        if (
+            not do_not_backup
+            and output_file_path.exists()
+            and output_file_path.is_file()
+        ):
             _backup_existing(output_file_path)
         logger.info(
             "Начинаю сборку контейнера '{}' из '{}'",
@@ -288,6 +313,8 @@ class Builder(Processor):
             self._run_epf_erf_build(input_dir_path, output_file_path, force)
         elif suffix in EXTENSIONS_CF_CFE:
             self._run_cf_cfe_build(input_dir_path, output_file_path, force)
+        elif suffix in EXTENSIONS_CFU:
+            self._run_cfu_build(input_dir_path, output_file_path, force)
         elif suffix in EXTENSIONS_MD_ERT:
             self._run_md_ert_build(input_dir_path, output_file_path)
         else:

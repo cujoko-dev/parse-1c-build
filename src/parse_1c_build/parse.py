@@ -10,6 +10,7 @@ from loguru import logger
 from parse_1c_build import bsl, cf_layout
 from parse_1c_build.base import (
     EXTENSIONS_CF_CFE,
+    EXTENSIONS_CFU,
     EXTENSIONS_EPF_ERF,
     EXTENSIONS_MD_ERT,
     EXTENSIONS_V8UNPACK,
@@ -22,7 +23,7 @@ logger.disable(__name__)
 
 ERR_CWD_INPUTS_NOT_FOUND = (
     "Не найдено подходящих входных файлов "
-    "(.epf, .erf, .cf, .cfe, .md, .ert) в текущем каталоге "
+    "(.epf, .erf, .cf, .cfe, .cfu, .md, .ert) в текущем каталоге "
     "(и подкаталогах). Укажите файл или используйте -i"
 )
 ERR_INTERACTIVE_NOT_FOUND = (
@@ -132,12 +133,27 @@ class Parser(Processor):
         """Parse CF/CFE via v8unpack -P; organize Class/Object layout unless raw."""
         if self.use_reader:
             self.warn_use_reader_deprecated(logger)
-            logger.warning(
-                "--use-reader is ignored for .cf/.cfe; using v8unpack"
-            )
+            logger.warning("--use-reader is ignored for .cf/.cfe; using v8unpack")
         self._run_v8unpack_parse(input_file_path, output_dir_path, raw=True)
         if not raw:
             cf_layout.organize_configuration_dir(output_dir_path)
+        logger.info(f"'{input_file_path}' parsed to '{output_dir_path}'")
+
+    def _run_cfu(
+        self,
+        input_file_path: Path,
+        output_dir_path: Path,
+        raw: bool,
+    ) -> None:
+        """Parse CFU via v8unpack -P. Always raw: a CFU is a delta container
+        (metadata + full images of changed objects), not a CF layout, so
+        cf_layout organize/split does not apply."""
+        if not raw:
+            logger.warning(
+                "CFU is a delta container without a CF layout; "
+                "parsed raw (cf_layout organize/split skipped)"
+            )
+        self._run_v8unpack_parse(input_file_path, output_dir_path, raw=True)
         logger.info(f"'{input_file_path}' parsed to '{output_dir_path}'")
 
     def _run_v8reader(self, input_file_path: Path, output_dir_path: Path) -> None:
@@ -230,6 +246,8 @@ class Parser(Processor):
             self._run_epf_erf(input_file_path, output_dir_path, raw)
         elif suffix in EXTENSIONS_CF_CFE:
             self._run_cf_cfe(input_file_path, output_dir_path, raw)
+        elif suffix in EXTENSIONS_CFU:
+            self._run_cfu(input_file_path, output_dir_path, raw)
         elif suffix in EXTENSIONS_MD_ERT:
             self._run_md_ert(input_file_path, output_dir_path)
         else:

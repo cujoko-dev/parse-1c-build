@@ -4,7 +4,7 @@ description: >-
   PDM with a nested `.dev` project: installing dependencies and running tests
   or scripts via `pdm run -p .dev` without activating the venv. Use when the
   repository has `.dev/pyproject.toml` and the task touches Python,
-  dependencies, or tests.
+  dependencies, tests, or a version bump.
 ---
 
 # PDM and the `.dev` project
@@ -12,6 +12,9 @@ description: >-
 - The root `pyproject.toml` is the package.
 - Development tools (pytest, scripts in `[tool.pdm.scripts]`) live in the nested
   `.dev/pyproject.toml`, with its own lock and `.dev/.venv`.
+- The `version` in `.dev/pyproject.toml` is not the package version. Do not
+  bump it. When a release needs a new version, change the root
+  `pyproject.toml` only.
 - Runtime dependencies: `pdm install` or `pdm sync` from the root.
 - Dev dependencies: `pdm install -p .dev`.
 - Run tests and dev scripts with `pdm run -p .dev <script>` or

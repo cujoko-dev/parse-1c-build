@@ -155,10 +155,21 @@ if ($boardResource) {
             exit 75
         }
         else {
-            Write-Warning "Board lock unavailable ($lockExit): $($lockOutput | Out-String). Running without the shared lock."
+            $detail = ($lockOutput | Out-String).Trim()
+            if ($boardResource -eq "1c") {
+                Write-Host "Not started. The machine-wide 1C lock could not be taken (board exit $lockExit): $detail"
+                Write-Host "Fix the board, or pass -Lock none if this run does not touch 1C."
+                exit 2
+            }
+            Write-Warning "Board lock unavailable ($lockExit): $detail. Running without the shared lock."
         }
     }
     else {
+        if ($boardResource -eq "1c") {
+            Write-Host "Not started. python or board.py was not found, so the machine-wide 1C lock could not be taken."
+            Write-Host "Fix the board, or pass -Lock none if this run does not touch 1C."
+            exit 2
+        }
         Write-Warning "board.py or python not found; running without the shared '$boardResource' lock."
     }
 }

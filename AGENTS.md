@@ -191,8 +191,15 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
 - **Posting.** Before you post (a finding, unfinished or uncommitted work, a
   question, a decision, a handoff) or finish a handoff, read the `agent-board`
   skill. Without it, see `board.py post -h`.
-- **1C lock.** `scripts/run.ps1` takes the machine-wide `1c` lock on its own for
-  commands that drive 1C. If it exits with 75, another run holds 1C:
+- **1C lock.** Commands that drive 1C take the machine-wide `1c` lock through
+  `scripts/run.ps1` in `Python/codemask-1c-core`, `Python/ctl-1c`,
+  `Python/parse-1c-build`, or `Python/protect-1c`. A checkout without that
+  script runs the same command through one of those wrappers and passes
+  `-WorkingDirectory` for the checkout. The wrapper detects 1C by the command
+  text (`real_1c`, `test-1c`, `validate-*-vanessa`, `obfuscate-build`,
+  `syntax-check`, `vanessa`, `1cv8`). If the board cannot take the lock, the
+  wrapper exits 2 and does not start the command. If it exits with 75, another
+  run holds 1C:
   - do not retry in a loop;
   - wait with `-LockWaitSec`;
   - or pass `-Lock none` if the command does not touch 1C.
@@ -224,7 +231,10 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
 ## Commit messages
 
 - When you finish with changed files, suggest one concise, imperative commit
-  message per changed repository, in that repository's style.
+  message per changed repository, in that repository's style. Match the
+  messages already in the log. A plugin checklist of conventional prefixes
+  (`feat`, `fix`, `chore`) applies only when those prefixes are already the
+  repository's style.
 - Only suggest. Commit only on an explicit request (`/cm` or `$cm`).
 - Suggest nothing if no files changed.
 

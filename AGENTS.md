@@ -5,17 +5,21 @@ Shared agent guidance lives in `AGENTS.md` (this file) and `.agents/skills/`.
 
 ## Before Making Changes
 
-- Files under `.cursor/rules/` are project-only extras (globs, 1C, terminals), not a second copy of the shared rules.
-- For architecture or larger changes, read the relevant `.agents/skills/*/SKILL.md`.
+- Files under `.cursor/rules/` are project-only extras (globs, 1C, terminals),
+  not a second copy of the shared rules.
+- For architecture or larger changes, read the relevant
+  `.agents/skills/*/SKILL.md`.
 - Follow the managed sections below; they apply to every agent.
 
 ## Project-specific Cursor rules
 
-- `.cursor/rules/bsl-forms.mdc` before changing BSL form parsing, form files, or related fixtures.
+- `.cursor/rules/bsl-forms.mdc` before changing BSL form parsing, form files,
+  or related fixtures.
 
 ## Skills To Check
 
-- `.agents/skills/parse-1c-build-architecture/SKILL.md` for parser architecture, build parsing flow, and larger design changes.
+- `.agents/skills/parse-1c-build-architecture/SKILL.md` for parser
+  architecture, build parsing flow, and larger design changes.
 - `.agents/skills/pdm-dev-workflow/SKILL.md` for PDM-based development workflow.
 
 <!-- agent-rules:begin | управляется sync-agent-rules.py, правьте dev-utils/agent-rules/ -->
@@ -112,7 +116,8 @@ and `python -c`.
 
 ## Ruff after Python edits
 
-Ruff is a user-level CLI on PATH (`pipx install ruff`), not a project dependency.
+Ruff is a user-level CLI on PATH (`pipx install ruff`), not a project
+dependency.
 
 - After you change Python files, run `ruff check --fix` and `ruff format` on
   **those files only**, from the repository root so `[tool.ruff]` is picked up.
@@ -173,12 +178,14 @@ Do not load `.ai/*` in full when the MCP already answered.
 
 ## Shared agent board
 
-Other agents (Codex, Claude Code, Cursor) may be working on the same repositories
+Other agents (Codex, Claude Code, Cursor) may be working on the same
+repositories
 right now. The board is a small shared space for what they need from each other.
 Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
 
 - **At the start.** When you begin work in a repository, run
-  `board.py read --repo <path relative to C:\Dev>`. Use `Python/codemask-1c-core`
+  `board.py read --repo <path relative to C:\Dev>`. Use
+  `Python/codemask-1c-core`
   or `Docker/cujoko-dev`, not the directory name alone: `cujoko-dev` exists
   in several domains. It prints about 1 KB:
   - resource locks;
@@ -258,7 +265,8 @@ a `==== Summary ====` block.
 - **No loops.** No retry loops and no "run until green": run, inspect the
   failure, change the code, run again.
 - **No detached background processes** unless the user asked for them.
-- **Changing `scripts/run.ps1`.** Explain why first. It may clean up only its own
+- **Changing `scripts/run.ps1`.** Explain why first. It may clean up only its
+  own
   child process tree (`taskkill /T`):
   - never kill processes by name;
   - never scan for "similar" processes or match command lines.
@@ -288,7 +296,8 @@ than the task.
     timeout `wait_agent` allows. If that agent type is unavailable, use the next
     option.
   - **Otherwise:** use the longest wait the tool allows. In Codex that is
-    `yield_time_ms` up to `background_terminal_max_timeout` (30 minutes here). In
+    `yield_time_ms` up to `background_terminal_max_timeout` (30 minutes here).
+    In
     Claude Code, use `run_in_background` and wait for the notification. Poll no
     more often than every 5 minutes, then every 10, then 20.
   - Never give a long command a short `yield_time_ms` such as `1000`. Never poll
@@ -298,7 +307,8 @@ than the task.
   - No reading the tool's source to explain missing output: output often
     arrives only at the end.
 - **When it ends.** Read the `==== Summary ====` block. For an earlier run, get
-  it with `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or file>`.
+  it with
+  `python C:\Dev\Others\dev-utils\summarize-run-log.py <log dir or file>`.
   Open the full logs only if the summary is not enough, and read only around
   the reported line.
 - **Context.** Start a long run with a small context. If the conversation is

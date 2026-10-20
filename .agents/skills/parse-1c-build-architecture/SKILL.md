@@ -1,9 +1,12 @@
 ---
 name: parse-1c-build-architecture
 description: >-
-  Architecture of parse-1c-build: EPF/ERF/CF/CFE unpack/pack pipeline (v8unpack, V8Reader, gcomp),
-  BSL extraction layout (prefixes 0_/1_/2_/9_, objects/Class/Name for CF), meta/bin structure,
-  and round-trip rebuild. Use when modifying Parser/Builder, extending BSL split/merge,
+  Architecture of parse-1c-build: EPF/ERF/CF/CFE unpack/pack pipeline
+  (v8unpack, V8Reader, gcomp),
+  BSL extraction layout (prefixes 0_/1_/2_/9_, objects/Class/Name for CF),
+  meta/bin structure,
+  and round-trip rebuild. Use when modifying Parser/Builder, extending BSL
+  split/merge,
   debugging roundtrip mismatches, or working with the p1cb CLI.
 ---
 
@@ -11,12 +14,17 @@ description: >-
 
 ## Что делает проект
 
-**parse-1c-build** — Python-библиотека и CLI для **распаковки и сборки** 1C-артефактов:
-- `.epf`/`.erf` — через **v8unpack** (по умолчанию) или deprecated **V8Reader + 1C платформа**
+**parse-1c-build** — Python-библиотека и CLI для **распаковки и сборки**
+1C-артефактов:
+
+- `.epf`/`.erf` — через **v8unpack** (по умолчанию) или deprecated **V8Reader +
+  1C платформа**
 - `.cf`/`.cfe` — через **v8unpack** + раскладка `Класс/Объект/`
 - `.md`/`.ert` — через **GComp**
 
-Проект **не** парсит BSL в AST. Он оркестрирует внешние инструменты и добавляет слой **извлечения BSL** из артефактов v8unpack чтобы модули были редактируемы как `.bsl`-файлы со стабильной структурой `bin/ + meta/`.
+Проект **не** парсит BSL в AST. Он оркестрирует внешние инструменты и добавляет
+слой **извлечения BSL** из артефактов v8unpack чтобы модули были редактируемы
+как `.bsl`-файлы со стабильной структурой `bin/ + meta/`.
 
 ## Точки входа
 
@@ -26,19 +34,20 @@ description: >-
 
 ## Ключевые модули
 
-| Файл | Роль |
-|------|------|
-| `base.py` | `Processor`: настройки, пути к `v8unpack`/`gcomp`, deprecated `use_reader` |
-| `parse.py` | `Parser`: распаковка EPF/ERF/CF/CFE/MD/ERT |
-| `build.py` | `Builder`: сборка через v8unpack/GComp |
-| `bsl.py` | split/merge BSL, префиксы `0_`/`1_`/`2_`/`9_`, `meta/` + `bin/` |
-| `cf_layout.py` | CF/CFE: нарезка dump → `Класс/Объект/`, корень конфигурации |
-| `metadata_types.py` | UUID типов метаданных → имена классов |
-| `process_utils.py` | `run_silent` / `check_silent` |
+| Файл                | Роль                                                                       |
+| ------------------- | -------------------------------------------------------------------------- |
+| `base.py`           | `Processor`: настройки, пути к `v8unpack`/`gcomp`, deprecated `use_reader` |
+| `parse.py`          | `Parser`: распаковка EPF/ERF/CF/CFE/MD/ERT                                 |
+| `build.py`          | `Builder`: сборка через v8unpack/GComp                                     |
+| `bsl.py`            | split/merge BSL, префиксы `0_`/`1_`/`2_`/`9_`, `meta/` + `bin/`            |
+| `cf_layout.py`      | CF/CFE: нарезка dump → `Класс/Объект/`, корень конфигурации                |
+| `metadata_types.py` | UUID типов метаданных → имена классов                                      |
+| `process_utils.py`  | `run_silent` / `check_silent`                                              |
 
 ## Префиксы BSL
 
-- `0_` — модули объекта/конфигурации (Объект, Менеджер, УправляемоеПриложение, …)
+- `0_` — модули объекта/конфигурации (Объект, Менеджер, УправляемоеПриложение,
+  …)
 - `1_` — все формы (общие и объектов)
 - `2_` — все команды (общие и объектов)
 - `9_` — общие модули (только корень CF)
@@ -53,7 +62,8 @@ Parser.run(input.epf)
   → (если не --raw) bsl.split_dir(output_dir)
 ```
 
-**V8Reader-ветка (deprecated, только .epf/.erf):** пишет временный `.bat` (cp866), запускает 1cv8 с `/Execute V8Reader.epf`.
+**V8Reader-ветка (deprecated, только .epf/.erf):** пишет временный `.bat`
+(cp866), запускает 1cv8 с `/Execute V8Reader.epf`.
 
 ## Пайплайн распаковки CF/CFE
 
@@ -71,8 +81,10 @@ Parser.run(input.cf)
 ### Управляемые формы (`UUID.0`)
 
 - Имя файла соответствует regex `[0-9a-f]{8}-...-[0-9a-f]{12}\.0`
-- BSL спрятан как **строка** внутри 1C-кортежа — **3-й элемент** (index 2) корневого кортежа
-- `split_file` извлекает строку, убирает `""` → `"`, пишет `<companion>.bsl`, заменяет строку на `"<BSL_MODULE_PLACEHOLDER>"`
+- BSL спрятан как **строка** внутри 1C-кортежа — **3-й элемент** (index 2)
+  корневого кортежа
+- `split_file` извлекает строку, убирает `""` → `"`, пишет `<companion>.bsl`,
+  заменяет строку на `"<BSL_MODULE_PLACEHOLDER>"`
 
 ### Файлы `module` и `text`
 
@@ -81,7 +93,9 @@ Parser.run(input.cf)
 
 ### ❌ Файл `form`
 
-**Обычные формы** — файл `form` содержит **разметку/метаданные**, **НЕ** текст модуля. `split_file` **не обрабатывает** файл `form` как BSL, даже если внутри есть текст процедур. Это специфика `bsl-forms.mdc`.
+**Обычные формы** — файл `form` содержит **разметку/метаданные**, **НЕ** текст
+модуля. `split_file` **не обрабатывает** файл `form` как BSL, даже если внутри
+есть текст процедур. Это специфика `bsl-forms.mdc`.
 
 ### ❌ UUID без `.0`
 
@@ -108,7 +122,8 @@ output_dir/
     ...все остальные файлы...
 ```
 
-`_apply_bin_layout` перемещает всё (кроме `meta/`, `bin/`, корневых `*.bsl`) в `bin/` и перезаписывает оба `meta/*.txt`.
+`_apply_bin_layout` перемещает всё (кроме `meta/`, `bin/`, корневых `*.bsl`) в
+`bin/` и перезаписывает оба `meta/*.txt`.
 
 ## Round-trip: сборка обратно
 
@@ -140,8 +155,13 @@ tests/
 
 ## Практические заметки
 
-- **`--raw`:** только `v8unpack -P`, без `split_dir` — кортежные файлы остаются нетронутыми
-- **Кодировка:** читает с BOM → `utf-8-sig`; пишет через `write_bytes` чтобы не менять переводы строк
-- **Merge:** ищет `"<BSL_MODULE_PLACEHOLDER>"` в кортеже; если нет — первую пустую `""` (пустые модули)
-- **`_move_to_bin_with_retry`:** обход `PermissionError` при перемещении файлов на Windows
-- **Нет AST-модели:** «parsed state» — это файловая система; никакого in-memory графа объектов 1C нет
+- **`--raw`:** только `v8unpack -P`, без `split_dir` — кортежные файлы остаются
+  нетронутыми
+- **Кодировка:** читает с BOM → `utf-8-sig`; пишет через `write_bytes` чтобы не
+  менять переводы строк
+- **Merge:** ищет `"<BSL_MODULE_PLACEHOLDER>"` в кортеже; если нет — первую
+  пустую `""` (пустые модули)
+- **`_move_to_bin_with_retry`:** обход `PermissionError` при перемещении файлов
+  на Windows
+- **Нет AST-модели:** «parsed state» — это файловая система; никакого in-memory
+  графа объектов 1C нет

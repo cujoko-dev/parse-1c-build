@@ -18,8 +18,10 @@ $env:P1CB_RUST_FORCE_PYTHON = '1'
 
 ## What is ported
 
-- `organize_configuration_dir` — CF/CFE flat dump → `objects/Class/Name` + root BSL layout
-  (discovery, moves, BSL extract including managed-form tuple scanner, meta writes)
+- `organize_configuration_dir` — CF/CFE flat dump → `objects/Class/Name` + root
+  BSL layout
+  (discovery, moves, BSL extract including managed-form tuple scanner, meta
+  writes)
 
 ## Profiling
 

@@ -235,6 +235,41 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
 - **Validation entry points.** Expose checks such as syntax checks and dry
   runs as discoverable CLI options or menu items, not hidden internal steps.
 
+## Invariants and decisions
+
+Two things git history does not show: what must stay true, and why a choice
+was made.
+
+**Invariants.** A repository may list them in a `## Invariants` section of its
+local `AGENTS.md` (outside the managed block). Each is one line: the fact, and
+where it is enforced.
+
+- **Before touching one.** Stop and say which invariant the change affects. If
+  the change needs it relaxed, ask the user first and record the decision.
+- **No workarounds.** Do not satisfy a failing check by weakening it: no
+  `# noqa`, skipped or loosened tests, widened types, swallowed errors, or
+  special cases that route around the rule. Fix the cause or ask.
+- **Enforce cheaply.** When you add an invariant, put it in the cheapest form
+  that holds it: a type, then a schema or contract test, then a property test,
+  then an example. Prose in `AGENTS.md` is the last resort, for what costs
+  more to formalize than to violate.
+- **Do not invent them.** Add an invariant only when the user states it, or
+  the code and tests already enforce it. Verify before writing it down.
+
+**Decisions.** Short records in `docs/decisions/NNNN-slug.md`, as in
+`python/tree-sitter-bsl`.
+
+- **When to write one.** A real choice between alternatives, a reversal of an
+  earlier choice, or a constraint that looks wrong but is deliberate. Not for
+  routine fixes or features: git already has those.
+- **Shape.** Title, `Status` (Proposed, Accepted, Superseded by NNNN), `Date`,
+  `Context`, `Decision`, `Consequences`, and `Revisit when` (the trigger that
+  should reopen it). Keep it to one screen. Create it only after the user
+  agrees with the decision.
+- **Before a non-obvious change.** Check `docs/decisions/` for a record that
+  explains the current behavior. If the change contradicts one, supersede it
+  instead of editing it.
+
 ## Commit messages
 
 - When you finish with changed files, suggest one concise, imperative commit

@@ -242,6 +242,12 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
   messages already in the log. A plugin checklist of conventional prefixes
   (`feat`, `fix`, `chore`) applies only when those prefixes are already the
   repository's style.
+- When the log has no settled style, lead with the scope, then the change:
+  `scope: description`. The scope is the part of the project the change
+  touches (package, service, subsystem, document), not the kind of change
+  (`feat`, `fix`). Keep the ticket number out of the scope.
+- One commit, one change. If the diff mixes unrelated changes, such as a
+  refactor with a feature, suggest splitting it into separate commits.
 - Only suggest. Commit only on an explicit request (`/cm` or `$cm`).
 - Suggest nothing if no files changed.
 

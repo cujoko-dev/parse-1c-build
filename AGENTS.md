@@ -228,6 +228,10 @@ Run it with `python C:\Dev\Others\dev-utils\board.py`; add `-h` for options.
   user narrows the scope, but check per repository whether the rule applies.
   Change shared agent rules in their canon (`Others/dev-utils/agent-rules`),
   so Codex, Claude Code, and Cursor all get them.
+- **BSL formatting.** Use the `bsl-evotor-formatting` skill when creating or
+  editing any BSL module. Its canonical source is
+  `Others/dev-utils/skills/bsl-evotor-formatting/SKILL.md`. Preserve existing
+  behavior and the target project’s encoding and line-ending requirements.
 - **1C code comments.** Do not put a period at the end of a comment. Periods
   between sentences are fine; omit the period after the final sentence.
 - **Verdicts.** For trust or production-readiness reviews, say plainly
